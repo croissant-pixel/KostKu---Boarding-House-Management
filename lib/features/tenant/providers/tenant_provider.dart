@@ -78,23 +78,8 @@ class TenantProvider with ChangeNotifier {
     required int tenantId,
     required int roomId,
   }) async {
-    final db = await DBHelper.database;
-
-    // update tenant
-    await db.update(
-      'tenants',
-      {'room_id': null, 'check_out_date': DateTime.now().toIso8601String()},
-      where: 'id = ?',
-      whereArgs: [tenantId],
-    );
-
-    // update room
-    await db.update(
-      'rooms',
-      {'status': 'available', 'tenant_id': null},
-      where: 'id = ?',
-      whereArgs: [roomId],
-    );
+    // Gunakan method dari db_helper
+    await _dbHelper.checkOutTenant(tenantId: tenantId, roomId: roomId);
 
     await fetchTenants();
   }

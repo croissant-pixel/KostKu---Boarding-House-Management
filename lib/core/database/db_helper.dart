@@ -237,7 +237,22 @@ class DBHelper {
   // ==================== Tenants ====================
   Future<int> addTenant(Tenant tenant) async {
     final db = await database;
-    return await db.insert('tenants', tenant.toMap());
+
+    final id = await db.insert('tenants', {
+      'name': tenant.name,
+      'phone': tenant.phone,
+      'email': tenant.email,
+      'room_id': tenant.roomId, // ✅ Simpan room_id
+      'check_in_date': tenant.checkInDate?.toIso8601String(),
+      'check_out_date': tenant.checkOutDate?.toIso8601String(),
+      'duration_month': tenant.durationMonth,
+      'ktp_photo': tenant.ktpPhoto,
+      'profile_photo': tenant.profilePhoto,
+      'emergency_contact': tenant.emergencyContact,
+      'check_in_lat': tenant.checkInLat,
+      'check_in_lng': tenant.checkInLng,
+    });
+    return id;
   }
 
   Future<List<Tenant>> getTenants() async {
@@ -325,45 +340,66 @@ class DBHelper {
   }) async {
     final db = await database;
 
-    await db.transaction((txn) async {
-      // Update tenant
-      await txn.update(
-        'tenants',
-        {
-          'room_id': roomId,
-          'check_in_date': checkInDate.toIso8601String(),
-          'duration_month': durationMonth,
-          'check_in_lat': lat,
-          'check_in_lng': lng,
-        },
-        where: 'id = ?',
-        whereArgs: [tenantId],
-      );
+    // Hitung check-out date
+    final checkOutDate = DateTime(
+      checkInDate.year,
+      checkInDate.month + durationMonth,
+      checkInDate.day,
+    );
 
-      // Update room status AND tenant_id
-      await txn.update(
-        'rooms',
-        {'status': RoomStatus.occupied.name, 'tenant_id': tenantId},
-        where: 'id = ?',
-        whereArgs: [roomId],
-      );
-    });
+
+    // Update tenant data
+    await db.update(
+      'tenants',
+      {
+        'room_id': roomId,
+        'check_in_date': checkInDate.toIso8601String(),
+        'check_out_date': checkOutDate.toIso8601String(),
+        'duration_month': durationMonth,
+        'check_in_lat': lat,
+        'check_in_lng': lng,
+      },
+      where: 'id = ?',
+      whereArgs: [tenantId],
+    );
+
+
+    // Update room status ke occupied
+    await db.update(
+      'rooms',
+      {
+        'status': 'occupied', // ✅ Set status occupied
+        'tenant_id': tenantId,
+      },
+      where: 'id = ?',
+      whereArgs: [roomId],
+    );
+
+
+    // Verify
+    final room = await db.query('rooms', where: 'id = ?', whereArgs: [roomId]);
   }
 
   Future<Tenant?> getActiveTenantByRoom(int roomId) async {
     final db = await database;
 
-    final maps = await db.query(
+
+    // Cari tenant yang room_id-nya sesuai (tenant yang checkout akan punya room_id = null)
+    final List<Map<String, dynamic>> maps = await db.query(
       'tenants',
-      where: 'room_id = ? AND check_out_date IS NULL',
+      where: 'room_id = ?',
       whereArgs: [roomId],
+      orderBy: 'check_in_date DESC',
       limit: 1,
     );
 
-    if (maps.isNotEmpty) {
-      return Tenant.fromMap(maps.first);
+    if (maps.isEmpty) {
+      return null;
     }
-    return null;
+
+    final tenant = Tenant.fromMap(maps.first);
+
+    return tenant;
   }
 
   Future<void> checkOutTenant({
@@ -373,10 +409,13 @@ class DBHelper {
     final db = await database;
 
     await db.transaction((txn) async {
-      // Update tenant
+      // Update tenant - set room_id = null
       await txn.update(
         'tenants',
-        {'check_out_date': DateTime.now().toIso8601String(), 'room_id': null},
+        {
+          'check_out_date': DateTime.now().toIso8601String(),
+          'room_id': null, // ✅ PENTING: Set null
+        },
         where: 'id = ?',
         whereArgs: [tenantId],
       );
@@ -384,11 +423,12 @@ class DBHelper {
       // Update room status jadi available
       await txn.update(
         'rooms',
-        {'status': RoomStatus.available.name},
+        {'status': RoomStatus.available.name, 'tenant_id': null},
         where: 'id = ?',
         whereArgs: [roomId],
       );
     });
+
   }
 
   Future<List<Room>> getRooms() async {

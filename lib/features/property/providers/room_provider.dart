@@ -33,10 +33,19 @@ class RoomProvider with ChangeNotifier {
       room.photos = photos;
       _roomPhotos[room.id!] = photos;
 
-      // ambil tenant aktif (HANYA untuk nama)
+      // ambil tenant aktif
       final tenant = await _dbHelper.getActiveTenantByRoom(room.id!);
-      room.tenantName = tenant?.name;
-      // ❌ JANGAN UBAH room.status DI SINI
+
+      // ✅ UPDATE semua data dari tenant
+      if (tenant != null) {
+        room.tenantName = tenant.name;
+        room.tenantId = tenant.id;
+        room.status = RoomStatus.occupied; // ✅ SET STATUS OCCUPIED
+      } else {
+        room.tenantName = null;
+        room.tenantId = null;
+        room.status = RoomStatus.available; // ✅ SET STATUS AVAILABLE
+      }
     }
 
     _rooms = roomsFromDb;
@@ -97,6 +106,7 @@ class RoomProvider with ChangeNotifier {
     required double lat,
     required double lng,
   }) async {
+
     await _dbHelper.checkInTenant(
       tenantId: tenantId,
       roomId: roomId,
@@ -105,6 +115,7 @@ class RoomProvider with ChangeNotifier {
       lat: lat,
       lng: lng,
     );
-    await fetchRooms();
+
+    // ❌ JANGAN fetchRooms() di sini, biar di tenant_form yang handle
   }
 }

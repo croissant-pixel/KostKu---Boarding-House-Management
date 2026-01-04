@@ -221,48 +221,95 @@ class _TenantFormPageState extends State<TenantFormPage> {
               ElevatedButton(
                 onPressed: () async {
                   if (!_formKey.currentState!.validate()) return;
+                  if (_selectedRoomId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Pilih kamar terlebih dahulu'),
+                      ),
+                    );
+                    return;
+                  }
 
                   final tenantProvider = context.read<TenantProvider>();
                   final roomProvider = context.read<RoomProvider>();
 
-                  // ================= 1️⃣ BUILD TENANT =================
-                  final tenant = Tenant(
-                    id: widget.tenant?.id,
-                    name: _nameController.text,
-                    phone: _phoneController.text,
-                    email: _emailController.text,
-                    emergencyContact: _emergencyController.text,
-                    roomId: _selectedRoomId,
-                    checkInDate: _checkInDate ?? DateTime.now(),
-                    checkOutDate: _checkOutDate,
-                    ktpPhoto: _ktpPhotoPath,
-                    profilePhoto: _profilePhotoPath,
-                  );
+                  try {
+                    // Hitung duration dari check-in dan check-out date
+                    int durationMonth = 1;
+                    if (_checkInDate != null && _checkOutDate != null) {
+                      durationMonth =
+                          ((_checkOutDate!.year - _checkInDate!.year) * 12 +
+                          _checkOutDate!.month -
+                          _checkInDate!.month);
+                      if (durationMonth < 1) durationMonth = 1;
+                    }
 
-                  int tenantId;
+                    // ================= BUILD TENANT =================
+                    final tenant = Tenant(
+                      id: widget.tenant?.id,
+                      name: _nameController.text,
+                      phone: _phoneController.text,
+                      email: _emailController.text,
+                      emergencyContact: _emergencyController.text,
+                      roomId: _selectedRoomId,
+                      checkInDate: _checkInDate ?? DateTime.now(),
+                      checkOutDate: _checkOutDate,
+                      ktpPhoto: _ktpPhotoPath,
+                      profilePhoto: _profilePhotoPath,
+                      durationMonth: durationMonth,
+                    );
 
-                  // ================= 2️⃣ ADD / UPDATE TENANT =================
-                  if (widget.tenant == null) {
-                    tenantId = await tenantProvider.addTenant(tenant);
-                  } else {
-                    await tenantProvider.updateTenant(tenant);
-                    tenantId = widget.tenant!.id!;
-                  }
+                    int tenantId;
 
-                  // ================= 3️⃣ CHECK-IN TENANT =================
-                  if (_selectedRoomId != null) {
-                    await roomProvider.checkInTenant(
+                    // ================= ADD / UPDATE TENANT =================
+                    if (widget.tenant == null) {
+                      // Tambah tenant baru
+                      tenantId = await tenantProvider.addTenant(tenant);
+                    } else {
+                      // Update tenant existing
+                      tenantId = widget.tenant!.id!;
+                      await tenantProvider.updateTenant(tenant);
+                    }
+
+                    // ================= CHECK-IN (UPDATE ROOM STATUS) =================
+                    await tenantProvider.checkInTenant(
                       tenantId: tenantId,
                       roomId: _selectedRoomId!,
                       checkInDate: tenant.checkInDate!,
-                      durationMonth: tenant.durationMonth,
-                      lat: tenant.checkInLat ?? 0,
-                      lng: tenant.checkInLng ?? 0,
+                      durationMonth: durationMonth,
+                      lat: 0, // TODO: implement geolocation if needed
+                      lng: 0,
                     );
-                  }
 
-                  // ================= 4️⃣ DONE =================
-                  Navigator.pop(context);
+                    // ================= REFRESH DATA =================
+                    await Future.wait([
+                      roomProvider.fetchRooms(),
+                      tenantProvider.fetchTenants(),
+                    ]);
+
+                    // ================= CLOSE PAGE =================
+                    if (mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            widget.tenant == null
+                                ? 'Tenant berhasil ditambahkan ke ${_selectedRoomId}'
+                                : 'Tenant berhasil diupdate',
+                          ),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Gagal: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
                 },
                 child: const Text('Submit Tenant'),
               ),

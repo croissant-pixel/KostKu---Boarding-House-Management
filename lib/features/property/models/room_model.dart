@@ -12,7 +12,7 @@ class Room {
   final String facilities;
   final String photoUrl;
   List<String>? photos;
-  final int? tenantId;
+  int? tenantId;
   String? tenantName;
 
   Room({
