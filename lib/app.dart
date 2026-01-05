@@ -12,7 +12,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'KostKu',
       theme: ThemeData(primarySwatch: Colors.indigo),
-      home: const RoomListPage(),
+      home: const HomePage(),
     );
   }
 }

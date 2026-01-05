@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:kostku/features/property/pages/room_list_page.dart';
+import 'package:kostku/features/tenant/pages/tenant_list_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -17,14 +19,20 @@ class HomePage extends StatelessWidget {
             icon: Icons.home_work,
             title: 'Kamar',
             onTap: () {
-              // TODO: Room List Page
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => RoomListPage()),
+              );
             },
           ),
           _menuCard(
             icon: Icons.people,
             title: 'Penyewa',
             onTap: () {
-              // TODO: Tenant List Page (MODULE 2)
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => TenantListPage()),
+              );
             },
           ),
           _menuCard(

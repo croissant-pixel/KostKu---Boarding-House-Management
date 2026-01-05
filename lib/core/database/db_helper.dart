@@ -1,4 +1,5 @@
 import 'package:kostku/features/auth/models/user_model.dart';
+import 'package:kostku/features/payment/models/payment_model.dart';
 import 'package:kostku/features/property/models/room_model.dart';
 import 'package:kostku/features/property/models/kost_model.dart';
 import 'package:kostku/features/tenant/models/tenant_model.dart';
@@ -20,7 +21,7 @@ class DBHelper {
 
     return await openDatabase(
       path,
-      version: 4, // upgrade versi untuk tambah kost + photo gallery
+      version: 5, // upgrade versi untuk payment
       onCreate: (db, version) async {
         // Tabel rooms
         await db.execute('''
@@ -94,6 +95,8 @@ class DBHelper {
             emergency_contact TEXT,
             check_in_lat REAL,
             check_in_lng REAL,
+            check_out_lat REAL,
+            check_out_lng REAL,
             FOREIGN KEY (room_id) REFERENCES rooms(id)
           )
         ''');
@@ -104,6 +107,31 @@ class DBHelper {
             username TEXT UNIQUE,
             password TEXT,
             role TEXT  -- "owner" atau "tenant" nanti
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id INTEGER NOT NULL,
+            month TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            paid_date TEXT,
+            status TEXT NOT NULL,
+            receipt_photo TEXT,
+            notes TEXT,
+            FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+          )
+        ''');
+
+                // Tabel monthly_stats untuk analytics
+                await db.execute('''
+          CREATE TABLE monthly_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            month TEXT NOT NULL UNIQUE,
+            occupancy_rate REAL,
+            total_revenue INTEGER,
+            payment_collection_rate REAL
           )
         ''');
       },
@@ -405,6 +433,8 @@ class DBHelper {
   Future<void> checkOutTenant({
     required int tenantId,
     required int roomId,
+    double? lat, // ✅ GPS checkout
+    double? lng, // ✅ GPS checkout
   }) async {
     final db = await database;
 
@@ -415,6 +445,8 @@ class DBHelper {
         {
           'check_out_date': DateTime.now().toIso8601String(),
           'room_id': null, // ✅ PENTING: Set null
+          'check_out_lat': lat, // ✅ Simpan lokasi checkout
+          'check_out_lng': lng, // ✅ Simpan lokasi checkout
         },
         where: 'id = ?',
         whereArgs: [tenantId],
@@ -437,5 +469,280 @@ class DBHelper {
 
     // convert dari Map ke Room
     return maps.map((e) => Room.fromMap(e)).toList();
+  }
+
+  // ==================== Payments ====================
+  Future<int> getMonthlyRevenue(DateTime month) async {
+    final db = await database;
+
+    final startOfMonth = DateTime(month.year, month.month, 1);
+    final endOfMonth = DateTime(month.year, month.month + 1, 0);
+
+    final result = await db.rawQuery(
+      '''
+    SELECT COALESCE(SUM(amount), 0) as total
+    FROM payments
+    WHERE status = 'paid'
+    AND paid_date >= ? AND paid_date <= ?
+  ''',
+      [startOfMonth.toIso8601String(), endOfMonth.toIso8601String()],
+    );
+
+    return result.first['total'] as int;
+  }
+
+  Future<double> getPaymentCollectionRate(DateTime month) async {
+    final db = await database;
+
+    final startOfMonth = DateTime(month.year, month.month, 1);
+    final endOfMonth = DateTime(month.year, month.month + 1, 0);
+
+    final result = await db.rawQuery(
+      '''
+    SELECT 
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_count
+    FROM payments
+    WHERE month >= ? AND month <= ?
+  ''',
+      [startOfMonth.toIso8601String(), endOfMonth.toIso8601String()],
+    );
+
+    final total = result.first['total'] as int;
+    final paidCount = result.first['paid_count'] as int;
+
+    if (total == 0) return 0.0;
+    return (paidCount / total) * 100;
+  }
+  
+  Future<double> getOccupancyRate() async {
+    final db = await database;
+
+    final result = await db.rawQuery('''
+    SELECT 
+      COUNT(*) as total_rooms,
+      SUM(CASE WHEN status = 'occupied' THEN 1 ELSE 0 END) as occupied_rooms
+    FROM rooms
+  ''');
+
+    final total = result.first['total_rooms'] as int;
+    final occupied = result.first['occupied_rooms'] as int;
+
+    if (total == 0) return 0.0;
+    return (occupied / total) * 100;
+  }
+
+  Future<int> getOutstandingPaymentsCount() async {
+    final db = await database;
+
+    final result = await db.rawQuery('''
+    SELECT COUNT(*) as count
+    FROM payments
+    WHERE status IN ('pending', 'overdue')
+  ''');
+
+    return result.first['count'] as int;
+  }
+
+  // Get monthly revenue chart data (last 6 months)
+  Future<List<Map<String, dynamic>>> getRevenueChartData() async {
+    final db = await database;
+    final now = DateTime.now();
+
+    List<Map<String, dynamic>> data = [];
+
+    for (int i = 5; i >= 0; i--) {
+      final month = DateTime(now.year, now.month - i, 1);
+      final endOfMonth = DateTime(now.year, now.month - i + 1, 0);
+
+      final result = await db.rawQuery(
+        '''
+      SELECT COALESCE(SUM(amount), 0) as revenue
+      FROM payments
+      WHERE status = 'paid'
+      AND paid_date >= ? AND paid_date <= ?
+    ''',
+        [month.toIso8601String(), endOfMonth.toIso8601String()],
+      );
+
+      data.add({'month': month, 'revenue': result.first['revenue'] as int});
+    }
+
+    return data;
+  }
+
+  // ==================== PAYMENT METHODS ====================
+
+  Future<int> addPayment(Payment payment) async {
+    final db = await database;
+
+    print('💰 DB: Adding payment for tenant ${payment.tenantId}');
+    print('   Month: ${payment.monthString}');
+    print('   Amount: Rp ${payment.amount}');
+
+    final id = await db.insert('payments', payment.toMap());
+
+    print('✅ DB: Payment added with ID: $id');
+    return id;
+  }
+
+  Future<List<Payment>> getPayments() async {
+    final db = await database;
+
+    final maps = await db.rawQuery('''
+      SELECT 
+        p.*,
+        t.name as tenant_name,
+        r.number as room_number
+      FROM payments p
+      LEFT JOIN tenants t ON p.tenant_id = t.id
+      LEFT JOIN rooms r ON t.room_id = r.id
+      ORDER BY p.month DESC, p.status ASC
+    ''');
+
+    return maps.map((map) => Payment.fromMap(map)).toList();
+  }
+
+  Future<List<Payment>> getPaymentsByTenant(int tenantId) async {
+    final db = await database;
+
+    final maps = await db.rawQuery(
+      '''
+      SELECT 
+        p.*,
+        t.name as tenant_name,
+        r.number as room_number
+      FROM payments p
+      LEFT JOIN tenants t ON p.tenant_id = t.id
+      LEFT JOIN rooms r ON t.room_id = r.id
+      WHERE p.tenant_id = ?
+      ORDER BY p.month DESC
+    ''',
+      [tenantId],
+    );
+
+    return maps.map((map) => Payment.fromMap(map)).toList();
+  }
+
+  Future<List<Payment>> getPaymentsByMonth(DateTime month) async {
+    final db = await database;
+
+    final startOfMonth = DateTime(month.year, month.month, 1);
+    final endOfMonth = DateTime(month.year, month.month + 1, 0);
+
+    final maps = await db.rawQuery(
+      '''
+      SELECT 
+        p.*,
+        t.name as tenant_name,
+        r.number as room_number
+      FROM payments p
+      LEFT JOIN tenants t ON p.tenant_id = t.id
+      LEFT JOIN rooms r ON t.room_id = r.id
+      WHERE p.month >= ? AND p.month <= ?
+      ORDER BY p.status ASC, t.name ASC
+    ''',
+      [startOfMonth.toIso8601String(), endOfMonth.toIso8601String()],
+    );
+
+    return maps.map((map) => Payment.fromMap(map)).toList();
+  }
+
+  Future<int> updatePayment(Payment payment) async {
+    final db = await database;
+
+    print('💰 DB: Updating payment ID ${payment.id}');
+    print('   Status: ${payment.status.name}');
+
+    final count = await db.update(
+      'payments',
+      payment.toMap(),
+      where: 'id = ?',
+      whereArgs: [payment.id],
+    );
+
+    print('✅ DB: Payment updated ($count rows)');
+    return count;
+  }
+
+  Future<void> deletePayment(int id) async {
+    final db = await database;
+    await db.delete('payments', where: 'id = ?', whereArgs: [id]);
+    print('✅ DB: Payment deleted (ID: $id)');
+  }
+
+  Future<void> markPaymentAsPaid({
+    required int paymentId,
+    required DateTime paidDate,
+    String? receiptPhoto,
+  }) async {
+    final db = await database;
+
+    await db.update(
+      'payments',
+      {
+        'status': 'paid',
+        'paid_date': paidDate.toIso8601String(),
+        'receipt_photo': receiptPhoto,
+      },
+      where: 'id = ?',
+      whereArgs: [paymentId],
+    );
+
+    print('✅ Payment marked as paid (ID: $paymentId)');
+  }
+
+  Future<void> updateOverduePayments() async {
+    final db = await database;
+
+    final now = DateTime.now();
+
+    await db.rawUpdate(
+      '''
+      UPDATE payments
+      SET status = 'overdue'
+      WHERE status = 'pending'
+      AND date(month) < date(?)
+    ''',
+      [now.toIso8601String()],
+    );
+
+    print('✅ Overdue payments updated');
+  }
+
+  Future<void> generateMonthlyPayments(DateTime month) async {
+    final db = await database;
+
+    print('💰 Generating payments for ${month.year}-${month.month}...');
+
+    final tenants = await db.rawQuery('''
+      SELECT t.*, r.price
+      FROM tenants t
+      JOIN rooms r ON t.room_id = r.id
+      WHERE t.room_id IS NOT NULL
+    ''');
+
+    final startOfMonth = DateTime(month.year, month.month, 1);
+
+    for (var tenant in tenants) {
+      final existing = await db.query(
+        'payments',
+        where: 'tenant_id = ? AND month = ?',
+        whereArgs: [tenant['id'], startOfMonth.toIso8601String()],
+      );
+
+      if (existing.isEmpty) {
+        await db.insert('payments', {
+          'tenant_id': tenant['id'],
+          'month': startOfMonth.toIso8601String(),
+          'amount': tenant['price'],
+          'status': 'pending',
+        });
+
+        print('   ✅ Payment created for tenant ${tenant['name']}');
+      }
+    }
+
+    print('✅ Monthly payments generated');
   }
 }

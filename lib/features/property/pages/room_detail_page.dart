@@ -1,13 +1,17 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:kostku/core/services/location_service.dart';
 import 'package:kostku/features/tenant/models/tenant_model.dart';
 import 'package:kostku/features/tenant/providers/tenant_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/room_model.dart';
 import '../providers/room_provider.dart';
 import 'package:collection/collection.dart';
+import 'package:kostku/core/services/url_launcher_service.dart';
 
 class RoomDetailPage extends StatefulWidget {
   final Room room;
@@ -20,6 +24,7 @@ class RoomDetailPage extends StatefulWidget {
 
 class _RoomDetailPageState extends State<RoomDetailPage> {
   final ImagePicker _picker = ImagePicker();
+  final _locationService = LocationService();
 
   @override
   void initState() {
@@ -519,6 +524,41 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                     ),
                                   ],
                                 ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        icon: const Icon(Icons.phone),
+                                        label: const Text('Hubungi'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                        ),
+                                        onPressed: () async {
+                                          await UrlLauncherService.makePhoneCall(
+                                            context,
+                                            tenant.phone,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        icon: const Icon(Icons.email),
+                                        label: const Text('Email'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.blue,
+                                        ),
+                                        onPressed: () async {
+                                          await UrlLauncherService.sendEmail(
+                                            context,
+                                            tenant.email,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
                           ),
@@ -656,8 +696,23 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                               context: context,
                               builder: (_) => AlertDialog(
                                 title: const Text('Checkout Penyewa'),
-                                content: Text(
-                                  'Yakin ingin checkout ${tenant.name}?',
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Yakin ingin checkout ${tenant.name}?',
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      '📍 Lokasi GPS akan direkam saat checkout',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontStyle: FontStyle.italic,
+                                        color: Colors.orange,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 actions: [
                                   TextButton(
@@ -691,11 +746,26 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                             }
 
                             try {
+                              // ✅ GET GPS LOCATION FOR CHECKOUT
+                              Position? position;
+                              try {
+                                position = await _locationService
+                                    .getCurrentLocation();
+                              } catch (e) {
+                                print(
+                                  'Warning: Could not get GPS location: $e',
+                                );
+                                // Continue checkout even if GPS fails
+                              }
+
+                              // ✅ CHECKOUT WITH GPS
                               await context
                                   .read<TenantProvider>()
                                   .checkOutTenant(
                                     tenantId: tenant.id!,
                                     roomId: room.id!,
+                                    lat: position?.latitude,
+                                    lng: position?.longitude,
                                   );
 
                               await context.read<RoomProvider>().fetchRooms();
@@ -706,14 +776,19 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                               // Close detail page
                               if (mounted) Navigator.pop(context);
 
-                              // Show success
+                              // Show success with GPS info
                               if (mounted) {
+                                final gpsInfo = position != null
+                                    ? '\n📍 GPS: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}'
+                                    : '\n⚠️ GPS tidak tersedia';
+
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      '${tenant.name} berhasil checkout',
+                                      '✅ ${tenant.name} berhasil checkout$gpsInfo',
                                     ),
                                     backgroundColor: Colors.green,
+                                    duration: const Duration(seconds: 4),
                                   ),
                                 );
                               }
@@ -732,7 +807,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                               }
                             }
                           },
-                        ),
+                        )
                       ),
                     ],
                   ),

@@ -11,6 +11,8 @@ class Tenant {
   final String? emergencyContact;
   final double? checkInLat;
   final double? checkInLng;
+  final double? checkOutLat; // NEW
+  final double? checkOutLng; // NEW
   final int durationMonth;
 
   Tenant({
@@ -26,6 +28,8 @@ class Tenant {
     this.emergencyContact,
     this.checkInLat,
     this.checkInLng,
+    this.checkOutLat,
+    this.checkOutLng,
     this.durationMonth = 1,
   });
 
@@ -44,6 +48,8 @@ class Tenant {
       'emergency_contact': emergencyContact,
       'check_in_lat': checkInLat,
       'check_in_lng': checkInLng,
+      'check_out_lat': checkOutLat,
+      'check_out_lng': checkOutLng,
     };
   }
 
@@ -70,6 +76,16 @@ class Tenant {
       checkInLng: map['check_in_lng'] != null
           ? map['check_in_lng'] as double
           : null, 
+          checkOutLat:
+          map['check_out_lat'] !=
+              null // ✅ NEW
+          ? map['check_out_lat'] as double
+          : null,
+      checkOutLng:
+          map['check_out_lng'] !=
+              null // ✅ NEW
+          ? map['check_out_lng'] as double
+          : null,
     );
   }
 
@@ -78,6 +94,8 @@ class Tenant {
     DateTime? checkOutDate,
     double? checkInLat,
     double? checkInLng,
+    double? checkOutLat, // NEW
+    double? checkOutLng, // NEW
     int? id,
     int? roomId,
   }) {
@@ -95,6 +113,8 @@ class Tenant {
       emergencyContact: emergencyContact,
       checkInLat: checkInLat ?? this.checkInLat,
       checkInLng: checkInLng ?? this.checkInLng,
+      checkOutLat: checkOutLat ?? this.checkOutLat,
+      checkOutLng: checkOutLng ?? this.checkOutLng,
     );
   }
 

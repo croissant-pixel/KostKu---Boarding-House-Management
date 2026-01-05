@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kostku/core/database/db_helper.dart';
+import 'package:kostku/core/services/notification_service.dart';
 import '../models/tenant_model.dart';
 
 class TenantProvider with ChangeNotifier {
@@ -18,6 +19,7 @@ class TenantProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   bool _isLoading = false;
   final DBHelper _dbHelper = DBHelper();
+  final _notificationService = NotificationService();
 
   /// Tenant aktif di room detail
   Tenant? _activeTenant;
@@ -62,24 +64,50 @@ class TenantProvider with ChangeNotifier {
     required double lat,
     required double lng,
   }) async {
-    await _dbHelper.checkInTenant(
-      tenantId: tenantId,
-      roomId: roomId,
-      checkInDate: checkInDate,
-      durationMonth: durationMonth,
-      lat: lat,
-      lng: lng,
-    );
-    await fetchTenants();
+    try {
+      // Save to database first
+      await _dbHelper.checkInTenant(
+        tenantId: tenantId,
+        roomId: roomId,
+        checkInDate: checkInDate,
+        durationMonth: durationMonth,
+        lat: lat,
+        lng: lng,
+      );
+
+      await fetchTenants();
+
+      // ✅ Try to schedule notification, but don't fail if it errors
+      try {
+        final tenant = _tenants.firstWhere((t) => t.id == tenantId);
+        if (tenant.checkOutDate != null) {
+          await _notificationService.scheduleContractReminder(
+            tenantId: tenant.id!,
+            tenantName: tenant.name,
+            checkoutDate: tenant.checkOutDate!,
+          );
+        }
+      } catch (notifError) {
+        // Just log the error, don't throw
+        print('⚠️ Notification scheduling failed: $notifError');
+        print('✅ But tenant check-in was successful!');
+      }
+    } catch (e) {
+      // Only throw if database operation fails
+      print('❌ Check-in failed: $e');
+      rethrow;
+    }
   }
 
   // ==================== CHECK-OUT TENANT ====================
   Future<void> checkOutTenant({
     required int tenantId,
     required int roomId,
+    double? lat, // ✅ Add
+    double? lng, // ✅ Add
   }) async {
     // Gunakan method dari db_helper
-    await _dbHelper.checkOutTenant(tenantId: tenantId, roomId: roomId);
+    await _dbHelper.checkOutTenant(tenantId: tenantId, roomId: roomId, lat: lat, lng: lng);
 
     await fetchTenants();
   }

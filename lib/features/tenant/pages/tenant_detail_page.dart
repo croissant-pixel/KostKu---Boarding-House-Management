@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:kostku/core/services/url_launcher_service.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../property/models/room_model.dart';
 import '../../property/providers/room_provider.dart';
 import '../models/tenant_model.dart';
@@ -139,6 +141,14 @@ class _TenantDetailPageState extends State<TenantDetailPage> {
             ),
             const SizedBox(height: 24),
             // Tombol checkout
+            ElevatedButton.icon(
+              icon: const Icon(Icons.phone),
+              label: Text('Hubungi ${tenant.name}'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              onPressed: () async {
+                await UrlLauncherService.makePhoneCall(context, tenant.phone);
+              },
+            ),
             ElevatedButton.icon(
               icon: const Icon(Icons.logout),
               label: const Text('Checkout Tenant'),
