@@ -69,7 +69,7 @@ class TenantProvider with ChangeNotifier {
       await _dbHelper.checkInTenant(
         tenantId: tenantId,
         roomId: roomId,
-        checkInDate: checkInDate,
+        checkInDate: checkInDate, 
         durationMonth: durationMonth,
         lat: lat,
         lng: lng,

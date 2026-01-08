@@ -20,14 +20,14 @@ void main() async {
         ChangeNotifierProvider(
           create: (_) {
             final provider = RoomProvider();
-            provider.fetchRooms(); // fetch saat provider dibuat
+            provider.fetchRooms();
             return provider;
           },
         ),
         ChangeNotifierProvider(
           create: (_) {
             final provider = KostProvider();
-            provider.fetchKost(); // kalau perlu fetch kost
+            provider.fetchKost();
             return provider;
           },
         ),
@@ -35,12 +35,19 @@ void main() async {
         ChangeNotifierProvider(
           create: (_) {
             final provider = TenantProvider();
-            provider.fetchTenants(); // fetch tenant langsung
+            provider.fetchTenants();
             return provider;
           },
         ),
         ChangeNotifierProvider(create: (_) => UserProvider()),
-        ChangeNotifierProvider(create: (_) => PaymentProvider()),
+        ChangeNotifierProvider(
+          create: (_) {
+            final provider = PaymentProvider();
+            provider.fetchPayments();
+            provider.fetchAnalytics();
+            return provider;
+          },
+        ),
       ],
       child: const MyApp(),
     ),

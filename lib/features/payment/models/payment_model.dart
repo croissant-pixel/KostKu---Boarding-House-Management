@@ -3,15 +3,14 @@ enum PaymentStatus { pending, paid, overdue }
 class Payment {
   final int? id;
   final int tenantId;
-  final String tenantName; // Untuk display
-  final String roomNumber; // Untuk display
-  final DateTime
-  month; // Bulan pembayaran (contoh: 2025-01-01 untuk Januari 2025)
-  final int amount; // Jumlah yang harus dibayar
-  final DateTime? paidDate; // Tanggal pembayaran aktual
+  final String tenantName;
+  final String roomNumber;
+  final DateTime month;
+  final int amount;
+  final DateTime? paidDate;
   PaymentStatus status;
-  final String? receiptPhoto; // Path foto struk pembayaran
-  final String? notes; // Catatan tambahan
+  final String? receiptPhoto;
+  final String? notes;
 
   Payment({
     this.id,
@@ -94,15 +93,15 @@ class Payment {
   bool checkOverdue() {
     if (isPaid) return false;
 
-    // Jika belum dibayar dan tanggal sekarang sudah lewat bulan pembayaran
     final now = DateTime.now();
-    final dueDate = DateTime(
-      month.year,
-      month.month + 1,
-      5,
-    ); // Jatuh tempo tanggal 5 bulan berikutnya
 
-    return now.isAfter(dueDate);
+    // Due date: tanggal 5 bulan berikutnya dari payment month
+    // Example: Januari 2026 → Due: 5 Februari 2026
+    final dueDate = DateTime(month.year, month.month + 1, 5);
+
+    final isOverdue = now.isAfter(dueDate);
+
+    return isOverdue;
   }
 
   // Get formatted month string
@@ -126,8 +125,68 @@ class Payment {
 
   // Get days until due date
   int get daysUntilDue {
-    final now = DateTime.now();
-    final dueDate = DateTime(month.year, month.month + 1, 5);
-    return dueDate.difference(now).inDays;
+    try {
+      final now = DateTime.now();
+
+      // Due date calculation:
+      // Payment month: Januari 2026 (2026-01-01)
+      // Due date: 5 Februari 2026 (2026-02-05)
+      final dueDate = DateTime(month.year, month.month + 1, 5);
+
+      // Calculate difference in days
+      final difference = dueDate.difference(now).inDays;
+
+      // ✅ DEBUG LOGGING (comment out in production)
+      print('📅 PAYMENT ${id ?? 'NEW'} - Days Until Due Calculation:');
+      print(
+        '   Payment Month: ${month.year}-${month.month.toString().padLeft(2, '0')}-01 (${monthString})',
+      );
+      print(
+        '   Due Date: ${dueDate.year}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}',
+      );
+      print(
+        '   Today: ${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
+      );
+      print('   Days Until Due: $difference days');
+      print(
+        '   Status: ${difference < 0
+            ? "OVERDUE"
+            : difference <= 7
+            ? "DUE SOON"
+            : "OK"}',
+      );
+
+      return difference;
+    } catch (e) {
+      print('❌ ERROR calculating daysUntilDue: $e');
+      print('   Payment ID: $id');
+      print('   Month: $month');
+      return 0;
+    }
+  }
+
+  // ✅ Alternative: Get due date as DateTime
+  DateTime get dueDate {
+    return DateTime(month.year, month.month + 1, 5);
+  }
+
+  // ✅ Get formatted due date string
+  String get dueDateString {
+    final due = dueDate;
+    const months = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+    return '${due.day} ${months[due.month - 1]} ${due.year}';
   }
 }

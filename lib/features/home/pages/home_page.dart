@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:kostku/features/payment/pages/analytics_dashboard_page.dart';
+import 'package:kostku/features/payment/pages/payment_list_page.dart';
 import 'package:kostku/features/property/pages/room_list_page.dart';
 import 'package:kostku/features/tenant/pages/tenant_list_page.dart';
 
@@ -39,10 +41,22 @@ class HomePage extends StatelessWidget {
             icon: Icons.receipt_long,
             title: 'Pembayaran',
             onTap: () {
-              // TODO: Payment Page (MODULE 3)
+              Navigator.push(
+               context,
+               MaterialPageRoute(builder: (_) => PaymentListPage()),
+              );
             },
           ),
-          _menuCard(icon: Icons.bar_chart, title: 'Laporan', onTap: () {}),
+          _menuCard(
+            icon: Icons.analytics,
+            title: 'Analytics',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => AnalyticsDashboardPage()),
+              );
+            },
+          ),
         ],
       ),
     );

@@ -576,13 +576,7 @@ class DBHelper {
   Future<int> addPayment(Payment payment) async {
     final db = await database;
 
-    print('💰 DB: Adding payment for tenant ${payment.tenantId}');
-    print('   Month: ${payment.monthString}');
-    print('   Amount: Rp ${payment.amount}');
-
     final id = await db.insert('payments', payment.toMap());
-
-    print('✅ DB: Payment added with ID: $id');
     return id;
   }
 
@@ -651,9 +645,6 @@ class DBHelper {
   Future<int> updatePayment(Payment payment) async {
     final db = await database;
 
-    print('💰 DB: Updating payment ID ${payment.id}');
-    print('   Status: ${payment.status.name}');
-
     final count = await db.update(
       'payments',
       payment.toMap(),
@@ -661,14 +652,12 @@ class DBHelper {
       whereArgs: [payment.id],
     );
 
-    print('✅ DB: Payment updated ($count rows)');
     return count;
   }
 
   Future<void> deletePayment(int id) async {
     final db = await database;
     await db.delete('payments', where: 'id = ?', whereArgs: [id]);
-    print('✅ DB: Payment deleted (ID: $id)');
   }
 
   Future<void> markPaymentAsPaid({
@@ -688,8 +677,6 @@ class DBHelper {
       where: 'id = ?',
       whereArgs: [paymentId],
     );
-
-    print('✅ Payment marked as paid (ID: $paymentId)');
   }
 
   Future<void> updateOverduePayments() async {
@@ -706,14 +693,11 @@ class DBHelper {
     ''',
       [now.toIso8601String()],
     );
-
-    print('✅ Overdue payments updated');
   }
 
   Future<void> generateMonthlyPayments(DateTime month) async {
     final db = await database;
 
-    print('💰 Generating payments for ${month.year}-${month.month}...');
 
     final tenants = await db.rawQuery('''
       SELECT t.*, r.price
@@ -738,11 +722,7 @@ class DBHelper {
           'amount': tenant['price'],
           'status': 'pending',
         });
-
-        print('   ✅ Payment created for tenant ${tenant['name']}');
       }
     }
-
-    print('✅ Monthly payments generated');
   }
 }

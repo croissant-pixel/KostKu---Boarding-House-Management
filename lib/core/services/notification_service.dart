@@ -56,12 +56,10 @@ class NotificationService {
       if (androidPlugin != null) {
         // Request notification permission
         final granted = await androidPlugin.requestNotificationsPermission();
-        print('📱 Notification permission: $granted');
 
         // Request exact alarm permission (Android 12+)
         final exactAlarmGranted = await androidPlugin
             .requestExactAlarmsPermission();
-        print('⏰ Exact alarm permission: $exactAlarmGranted');
       }
     } catch (e) {
       print('⚠️ Error requesting permissions: $e');
@@ -118,10 +116,6 @@ class NotificationService {
               UILocalNotificationDateInterpretation.absoluteTime,
           payload: 'tenant_$tenantId',
         );
-
-        print(
-          '✅ Scheduled exact reminder for $tenantName on ${_formatDate(reminderDate)}',
-        );
       } catch (e) {
         // ✅ Fallback: Use inexact schedule if exact not permitted
         print('⚠️ Exact alarm not permitted, using inexact schedule: $e');
@@ -148,20 +142,10 @@ class NotificationService {
               UILocalNotificationDateInterpretation.absoluteTime,
           payload: 'tenant_$tenantId',
         );
-
-        print('✅ Scheduled inexact reminder for $tenantName');
       }
     } catch (e) {
       // ✅ Don't throw error, just log it
       print('❌ Error scheduling contract reminder: $e');
-
-      // Show user-friendly message in debug mode
-      if (kDebugMode) {
-        print(
-          '💡 Tenant saved successfully, but notification scheduling failed',
-        );
-        print('💡 This is OK - the app will still work normally');
-      }
     }
   }
 
