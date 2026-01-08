@@ -2,6 +2,7 @@
 A new Flutter project.
 # KostKu---Boarding-House-Management
 Aplikasi manajemen kost untuk pemilik dan penyewa
+KostKu adalah aplikasi manajemen kost berbasis mobile yang memudahkan pemilik kost dalam mengelola properti, penyewa, dan keuangan secara terintegrasi. Dilengkapi dengan fitur GPS tracking, automatic payment generation, dan analytics dashboard.
 
 <img width="377" height="831" alt="Screenshot 2026-01-08 171804" src="https://github.com/user-attachments/assets/3de7abbe-a50d-4973-bb97-499f9f98273b" />
 <img width="375" height="830" alt="Screenshot 2026-01-08 171755" src="https://github.com/user-attachments/assets/b763d139-132f-4380-adf5-9499e164398d" />
