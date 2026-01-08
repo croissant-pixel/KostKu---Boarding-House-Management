@@ -19,14 +19,13 @@ KostKu adalah aplikasi manajemen kost berbasis mobile yang memudahkan pemilik ko
 
 Untuk Testing APK : https://drive.google.com/file/d/19zqtfd2h8XR2ckvt3daQv7xcbiJPcbek/view?usp=sharing
 
-cara menjalankan
-
+# cara menjalankan
 Flutter SDK (2.x or higher)
 Dart SDK (2.x or higher)
 Android Studio / VS Code
 Android device/emulator (API level 21+)
 
-Installation
+# Installation
 Clone the repository
 
 bash   git clone https://github.com/yourusername/kostku.git
@@ -49,7 +48,7 @@ flutter build appbundle --release
 Output location:
 APK: build/app/outputs/flutter-apk/app-release.apk
 
-Skema Database
+# Skema Database
 CREATE TABLE rooms (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             number TEXT,
